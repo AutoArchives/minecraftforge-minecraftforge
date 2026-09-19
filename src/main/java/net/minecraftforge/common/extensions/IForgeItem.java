@@ -319,10 +319,7 @@ public interface IForgeItem {
      */
     default boolean canPerformAction(ItemStack stack, ToolAction toolAction) {
         if (stack.is(ItemTags.SWORDS))
-            return ToolActions.DEFAULT_SWORD_ACTIONS.contains(toolAction);
-        else if (stack.is(ItemTags.PICKAXES))
-            return ToolActions.DEFAULT_PICKAXE_ACTIONS.contains(toolAction);
-
+            return toolAction == ToolActions.SWORD_SWEEP;
         return false;
     }
 
@@ -470,7 +467,7 @@ public interface IForgeItem {
      * @apiNote If the item stack is not {@linkplain ItemStack#isDamageableItem() damageable} or the player
      * {@linkplain Player#hasInfiniteMaterials() has infinite materials}, this method will not be called.
      */
-    default int damageItem(ItemStack stack, int damage, ServerLevel level, @Nullable ServerPlayer player, boolean canBreak, Consumer<Item> onBroken) {
+    default int damageItem(ItemStack stack, int damage, ServerLevel level, @Nullable ServerPlayer player, boolean canBreak, Consumer<ItemStack> onBroken) {
         return damage;
     }
 

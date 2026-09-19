@@ -9,7 +9,6 @@ import java.util.EnumSet;
 import java.util.List;
 
 import net.minecraft.core.registries.Registries;
-import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.level.block.BaseFireBlock;
 import net.minecraft.world.level.portal.PortalShape;
@@ -17,14 +16,11 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.enchantment.Enchantments;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.common.ForgeHooks;
-import net.minecraftforge.common.ToolAction;
-import net.minecraftforge.common.ToolActions;
 import net.minecraftforge.common.util.BlockSnapshot;
 import net.minecraftforge.common.util.HasResult;
 import net.minecraftforge.common.util.Result;
@@ -37,9 +33,10 @@ import net.minecraftforge.eventbus.api.event.RecordEvent;
 import net.minecraftforge.eventbus.api.event.characteristic.Cancellable;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jspecify.annotations.NullMarked;
 
 public sealed interface BlockEvent
-        permits BlockEvent.BlockToolModificationEvent, BlockEvent.BreakEvent, BlockEvent.CropGrowEvent,
+        permits BlockEvent.BreakEvent, BlockEvent.CropGrowEvent,
         BlockEvent.EntityPlaceEvent, BlockEvent.FarmlandTrampleEvent, BlockEvent.FluidPlaceBlockEvent,
         BlockEvent.NeighborNotifyEvent, BlockEvent.PortalSpawnEvent, NoteBlockEvent, PistonEvent {
     boolean DEBUG = Boolean.parseBoolean(System.getProperty("forge.debugBlockEvent", "false"));
@@ -50,10 +47,9 @@ public sealed interface BlockEvent
 
     BlockState getState();
 
-    /**
-     * Event that is fired when an Block is about to be broken by a player
-     * Setting the result to {@link Result#DENY} will prevent the Block from being broken.
-     */
+    /// Event that is fired when an Block is about to be broken by a player.
+    ///
+    /// Setting the result to [Result#DENY] will prevent the Block from being broken.
     final class BreakEvent extends MutableEvent implements Cancellable, BlockEvent, HasResult {
         public static final CancellableEventBus<BreakEvent> BUS = CancellableEventBus.create(BreakEvent.class);
 
@@ -61,7 +57,7 @@ public sealed interface BlockEvent
         private final BlockPos pos;
         private final BlockState state;
 
-        /** Reference to the Player who broke the block. If no player is available, use a EntityFakePlayer */
+        /// Reference to the Player who broke the block
         private final Player player;
         private int exp;
         private Result result;
@@ -103,20 +99,16 @@ public sealed interface BlockEvent
             return player;
         }
 
-        /**
-         * Get the experience dropped by the block after the event has processed
-         *
-         * @return The experience to drop or 0 if the event was denied
-         */
+        /// Get the experience dropped by the block after the event has processed
+        ///
+        /// @return The experience to drop or 0 if the event was denied
         public int getExpToDrop() {
             return this.getResult().isDenied() ? 0 : exp;
         }
 
-        /**
-         * Set the amount of experience dropped by the block after the event has processed
-         *
-         * @param exp 1 or higher to drop experience, else nothing will drop
-         */
+        /// Set the amount of experience dropped by the block after the event has processed
+        ///
+        /// @param exp 1 or higher to drop experience, else nothing will drop
         public void setExpToDrop(int exp) {
             this.exp = exp;
         }
@@ -132,11 +124,9 @@ public sealed interface BlockEvent
         }
     }
 
-    /**
-     * Called when a block is placed.
-     *
-     * If a Block Place event is cancelled, the block will not be placed.
-     */
+    /// Called when a block is placed.
+    ///
+    /// If a Block Place event is cancelled, the block will not be placed.
     sealed class EntityPlaceEvent extends MutableEvent implements Cancellable, BlockEvent {
         public static final CancellableEventBus<EntityPlaceEvent> BUS = CancellableEventBus.create(EntityPlaceEvent.class);
 
@@ -247,14 +237,9 @@ public sealed interface BlockEvent
         }
     }
 
-    /**
-     * Fired when a liquid places a block. Use {@link #setNewState(BlockState)} to change the result of
-     * a cobblestone generator or add variants of obsidian. Alternatively, you  could execute
-     * arbitrary code when lava sets blocks on fire, even preventing it.
-     *
-     * {@link #getState()} will return the block that was originally going to be placed.
-     * {@link #getPos()} will return the position of the block to be changed.
-     */
+    /// Fired when a liquid places a block. Use [#setNewState(BlockState)] to change the result of
+    /// a cobblestone generator or add variants of obsidian. Alternatively, you  could execute
+    /// arbitrary code when lava sets blocks on fire, even preventing it.
     final class FluidPlaceBlockEvent extends MutableEvent implements Cancellable, BlockEvent {
         public static final CancellableEventBus<FluidPlaceBlockEvent> BUS = CancellableEventBus.create(FluidPlaceBlockEvent.class);
 
@@ -280,26 +265,24 @@ public sealed interface BlockEvent
             return level;
         }
 
+        /// @return The position of the block to be changed.
         @Override
         public BlockPos getPos() {
             return pos;
         }
 
+        /// @return The block that was originally going to be placed.
         @Override
         public BlockState getState() {
             return state;
         }
 
-        /**
-         * @return The position of the liquid this event originated from. This may be the same as {@link #getPos()}.
-         */
+        /// @return The position of the liquid this event originated from. This may be the same as [#getPos()].
         public BlockPos getLiquidPos() {
             return liquidPos;
         }
 
-        /**
-         * @return The block state that will be placed after this event resolves.
-         */
+        /// @return The block state that will be placed after this event resolves.
         public BlockState getNewState() {
             return newState;
         }
@@ -308,29 +291,22 @@ public sealed interface BlockEvent
             this.newState = state;
         }
 
-        /**
-         * @return The state of the block to be changed before the event was fired.
-         */
+        /// @return The state of the block to be changed before the event was fired.
         public BlockState getOriginalState() {
             return origState;
         }
     }
 
-    /**
-     * Fired when a crop block grows.  See subevents.
-     */
+    /// Fired when a crop block grows. See subevents.
     sealed interface CropGrowEvent extends BlockEvent, InheritableEvent {
         EventBus<CropGrowEvent> BUS = EventBus.create(CropGrowEvent.class);
 
-        /**
-         * Fired when any "growing age" blocks (for example cacti, chorus plants, or crops
-         * in vanilla) attempt to advance to the next growth age state during a random tick.<br>
-         * <br>
-         * {@link Result#DEFAULT} will pass on to the vanilla growth mechanics.<br>
-         * {@link Result#ALLOW} will force the plant to advance a growth stage.<br>
-         * {@link Result#DENY} will prevent the plant from advancing a growth stage.<br>
-         * <br>
-         */
+        /// Fired when any "growing age" blocks (for example cacti, chorus plants, or crops
+        /// in vanilla) attempt to advance to the next growth age state during a random tick.
+        ///
+        /// - [Result#DEFAULT] will pass on to the vanilla growth mechanics.
+        /// - [Result#ALLOW] will force the plant to advance a growth stage.
+        /// - [Result#DENY] will prevent the plant from advancing a growth stage.
         record Pre(LevelAccessor getLevel, BlockPos getPos, BlockState getState, Result.Holder resultHolder)
                 implements CropGrowEvent, HasResult.Record {
             public static final EventBus<Pre> BUS = EventBus.create(Pre.class);
@@ -340,20 +316,23 @@ public sealed interface BlockEvent
             }
         }
 
-        /**
-         * Fired when "growing age" blocks (for example cacti, chorus plants, or crops
-         * in vanilla) have successfully grown. The block's original state is available,
-         * in addition to its new state.<br>
-         */
+        /// Fired when "growing age" blocks (for example cacti, chorus plants, or crops in vanilla) have successfully
+        /// grown. The block's original state is available, in addition to its new state.
         record Post(LevelAccessor getLevel, BlockPos getPos, BlockState getState, BlockState getOriginalState)
                 implements CropGrowEvent {
             public static final EventBus<Post> BUS = EventBus.create(Post.class);
         }
     }
 
-    /**
-     * Fired when farmland gets trampled
-     */
+    /// Fired when farmland gets trampled by an entity and is about to turn into dirt.
+    ///
+    /// This event is [Cancellable]. Cancelling prevents the farmland from turning into dirt.
+    ///
+    /// @param getLevel The level the farmland block is in
+    /// @param getPos The position of the farmland block in the level
+    /// @param getFallDistance The distance the entity fell before landing on the farmland block
+    /// @param getEntity The entity that trampled the farmland block
+    @NullMarked
     record FarmlandTrampleEvent(
             LevelAccessor getLevel,
             BlockPos getPos,
@@ -364,127 +343,13 @@ public sealed interface BlockEvent
         public static final CancellableEventBus<FarmlandTrampleEvent> BUS = CancellableEventBus.create(FarmlandTrampleEvent.class);
     }
 
-    /** Fired when an attempt is made to spawn a nether portal from
-     * {@link BaseFireBlock#onPlace(BlockState, Level, BlockPos, BlockState, boolean)}.
-     * <br>
-     * If cancelled, the portal will not be spawned.
-     */
+    /// Fired when an attempt is made to spawn a nether portal from
+    /// [BaseFireBlock#onPlace(BlockState, Level, BlockPos, BlockState, boolean)].
+    ///
+    /// This event is [Cancellable]. If cancelled, the portal will not be spawned.
+    @NullMarked
     record PortalSpawnEvent(LevelAccessor getLevel, BlockPos getPos, BlockState getState, PortalShape getPortalSize)
             implements Cancellable, BlockEvent, RecordEvent {
         public static final CancellableEventBus<PortalSpawnEvent> BUS = CancellableEventBus.create(PortalSpawnEvent.class);
-    }
-
-    /**
-     * Fired when a block is right-clicked by a tool to change its state.
-     * For example: Used to determine if {@link ToolActions#AXE_STRIP an axe can strip},
-     * {@link ToolActions#SHOVEL_FLATTEN a shovel can path}, or {@link ToolActions#HOE_TILL a hoe can till}.
-     * <p>
-     * Care must be taken to ensure level-modifying events are only performed if {@link #isSimulated()} returns {@code false}.
-     * <p>
-     * This event is {@linkplain Cancellable cancellable}. If cancelled, this will prevent the tool from changing
-     * the block's state.
-     */
-    final class BlockToolModificationEvent extends MutableEvent implements Cancellable, BlockEvent {
-        public static final CancellableEventBus<BlockToolModificationEvent> BUS = CancellableEventBus.create(BlockToolModificationEvent.class);
-
-        private final LevelAccessor level;
-        private final BlockPos pos;
-        private final BlockState originalState;
-
-        private final UseOnContext context;
-        private final ToolAction toolAction;
-        private final boolean simulate;
-        private BlockState state;
-
-        public BlockToolModificationEvent(BlockState originalState, @NotNull UseOnContext context, ToolAction toolAction, boolean simulate) {
-            this.level = context.getLevel();
-            this.pos = context.getClickedPos();
-            this.originalState = originalState;
-
-            this.context = context;
-            this.state = originalState;
-            this.toolAction = toolAction;
-            this.simulate = simulate;
-        }
-
-        @Override
-        public LevelAccessor getLevel() {
-            return level;
-        }
-
-        @Override
-        public BlockPos getPos() {
-            return pos;
-        }
-
-        @Override
-        public BlockState getState() {
-            return originalState;
-        }
-
-        /**
-         * @return the player using the tool.
-         * May be null based on what was provided by {@link #getContext() the use on context}.
-         */
-        @Nullable
-        public Player getPlayer() {
-            return this.context.getPlayer();
-        }
-
-        /**
-         * @return the tool being used
-         */
-        public ItemStack getHeldItemStack() {
-            return this.context.getItemInHand();
-        }
-
-        /**
-         * @return the action being performed
-         */
-        public ToolAction getToolAction() {
-            return this.toolAction;
-        }
-
-        /**
-         * Returns {@code true} if this event should not perform any actions that modify the level.
-         * If {@code false}, then level-modifying actions can be performed.
-         *
-         * @return {@code true} if this event should not perform any actions that modify the level.
-         * If {@code false}, then level-modifying actions can be performed.
-         */
-        public boolean isSimulated() {
-            return this.simulate;
-        }
-
-        /**
-         * Returns the nonnull use on context that this event was performed in.
-         *
-         * @return the nonnull use on context that this event was performed in
-         */
-        @NotNull
-        public UseOnContext getContext() {
-            return context;
-        }
-
-        /**
-         * Sets the state to transform the block into after tool use.
-         *
-         * @param finalState the state to transform the block into after tool use
-         * @see #getFinalState()
-         */
-        public void setFinalState(@Nullable BlockState finalState) {
-            this.state = finalState;
-        }
-
-        /**
-         * Returns the state to transform the block into after tool use.
-         * If {@link #setFinalState(BlockState)} is not called, this will return the original state.
-         * If {@link #isCanceled()} is {@code true}, this value will be ignored and the tool action will be canceled.
-         *
-         * @return the state to transform the block into after tool use
-         */
-        public BlockState getFinalState() {
-            return state;
-        }
     }
 }

@@ -35,7 +35,6 @@ import com.mojang.serialization.Decoder;
 import com.mojang.serialization.DynamicOps;
 import com.mojang.serialization.JsonOps;
 import com.mojang.serialization.Lifecycle;
-
 import io.netty.handler.codec.DecoderException;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.commands.CommandSourceStack;
@@ -68,6 +67,7 @@ import net.minecraft.tags.TagKey;
 import net.minecraft.util.CrudeIncrementalIntIdentityHashBiMap;
 import net.minecraft.util.GsonHelper;
 import net.minecraft.util.Mth;
+import net.minecraft.util.Prediction;
 import net.minecraft.util.datafix.fixes.StructuresBecomeConfiguredFix;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -91,7 +91,6 @@ import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import net.minecraft.world.level.storage.WorldData;
 import net.minecraft.world.level.storage.loot.LootContext;
-import net.minecraft.world.level.storage.loot.LootDataType;
 import net.minecraft.world.level.storage.loot.LootPool;
 import net.minecraft.world.level.storage.loot.LootTable;
 import net.minecraft.world.level.block.state.BlockState;
@@ -133,8 +132,8 @@ import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
 import net.minecraftforge.event.ForgeEventFactory;
 import net.minecraftforge.event.GrindstoneEvent;
 import net.minecraftforge.event.ModMismatchEvent;
-import net.minecraftforge.event.ServerChatEvent;
 import net.minecraftforge.event.RegisterStructureConversionsEvent;
+import net.minecraftforge.event.ServerChatEvent;
 import net.minecraftforge.event.entity.EntityAttributeCreationEvent;
 import net.minecraftforge.event.entity.EntityAttributeModificationEvent;
 import net.minecraftforge.event.entity.item.ItemTossEvent;
@@ -168,11 +167,11 @@ import net.minecraftforge.network.NetworkDirection;
 import net.minecraftforge.network.NetworkInitialization;
 import net.minecraftforge.network.NetworkRegistry;
 import net.minecraftforge.network.packets.SpawnEntity;
-import net.minecraftforge.resource.ResourcePackLoader;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.ForgeRegistry;
 import net.minecraftforge.registries.GameData;
 import net.minecraftforge.registries.RegistryManager;
+import net.minecraftforge.resource.ResourcePackLoader;
 import net.minecraftforge.server.permission.PermissionAPI;
 
 import org.apache.logging.log4j.LogManager;
@@ -307,9 +306,12 @@ public final class ForgeHooks {
 
     @SuppressWarnings("resource")
     @Nullable
-    public static ItemEntity onPlayerTossEvent(@NotNull Player player, @NotNull ItemStack item, boolean includeName) {
+    public static ItemEntity onPlayerTossEvent(@NotNull Player player, @NotNull ItemStack item, boolean thrownFromHand, Prediction prediction) {
+        if (item.isEmpty())
+            return null;
+
         player.captureDrops(new ArrayList<>());
-        ItemEntity ret = player.drop(item, false, includeName);
+        ItemEntity ret = player.drop(item, thrownFromHand, prediction);
         player.captureDrops(null);
 
         if (ret == null)
@@ -1213,7 +1215,7 @@ public final class ForgeHooks {
                     buf.writeVarInt(-1); // Our Marker
                     buf.writeIdentifier(key);
                 }
-                serializer.write(buf, value);
+                serializer.streamCodec().encode(buf, value);
             },
             (buf) -> {
                 buf.markReaderIndex();
@@ -1227,7 +1229,7 @@ public final class ForgeHooks {
                     if (serializer == null)
                         throw new DecoderException("Could not read ingredient of type: " + key);
                 }
-                return serializer.read(buf);
+                return serializer.streamCodec().decode(buf);
             }
         );
     }
@@ -1254,7 +1256,7 @@ public final class ForgeHooks {
 
     @SuppressWarnings("unchecked")
     public static <T> T onJsonDataParsed(Codec<T> codec, Identifier key, T value) {
-        if (codec == LootDataType.TABLE.codec()) {
+        if (codec == LootTable.DIRECT_CODEC) {
             var table = (LootTable)value;
             table.setLootTableId(key);
             value = (T)net.minecraftforge.event.ForgeEventFactory.onLoadLootTable(key, table);

@@ -16,7 +16,6 @@ import net.minecraft.tags.TagKey;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.decoration.ItemFrame;
-import net.minecraft.world.entity.monster.EnderMan;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemUseAnimation;
@@ -269,9 +268,6 @@ public class Tags {
          * This is patched into the following method: {@link EnderMan.EndermanLeaveBlockGoal#canPlaceBlock(Level, BlockPos, BlockState, BlockState, BlockState, BlockPos)}
          */
         public static final TagKey<Block> ENDERMAN_PLACE_ON_BLACKLIST = forgeTag("enderman_place_on_blacklist");
-        public static final TagKey<Block> NEEDS_WOOD_TOOL = forgeTag("needs_wood_tool");
-        public static final TagKey<Block> NEEDS_GOLD_TOOL = forgeTag("needs_gold_tool");
-        public static final TagKey<Block> NEEDS_NETHERITE_TOOL = forgeTag("needs_netherite_tool");
         public static final TagKey<Block> STORAGE_BLOCKS_AMETHYST = BlockItems.STORAGE_BLOCKS_AMETHYST.block();
         public static final TagKey<Block> STORAGE_BLOCKS_QUARTZ = BlockItems.STORAGE_BLOCKS_QUARTZ.block();
         //endregion
@@ -1224,10 +1220,6 @@ public class Tags {
         private static TagKey<Fluid> cTag(String name) {
             return FluidTags.create(Identifier.fromNamespaceAndPath("c", name));
         }
-
-        private static TagKey<Fluid> forgeTag(String name) {
-            return FluidTags.create(Identifier.fromNamespaceAndPath("forge", name));
-        }
     }
 
     public static class Enchantments {
@@ -1512,10 +1504,6 @@ public class Tags {
 
         private static TagKey<Biome> cTag(String name) {
             return TagKey.create(Registries.BIOME, Identifier.fromNamespaceAndPath("c", name));
-        }
-
-        private static TagKey<Biome> forgeTag(String name) {
-            return TagKey.create(Registries.BIOME, Identifier.fromNamespaceAndPath("forge", name));
         }
     }
 

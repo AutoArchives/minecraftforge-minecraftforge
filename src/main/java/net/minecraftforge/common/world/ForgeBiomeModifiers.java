@@ -8,6 +8,9 @@ package net.minecraftforge.common.world;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
+
+import org.jspecify.annotations.Nullable;
+
 import com.mojang.datafixers.util.Either;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
@@ -15,9 +18,11 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderSet;
-import net.minecraft.core.RegistryCodecs;
+import net.minecraft.core.registries.codec.RegistryCodecs;
 import net.minecraft.util.random.Weighted;
 import net.minecraft.util.random.WeightedList;
+import net.minecraft.world.attribute.EnvironmentAttributes;
+import net.minecraft.world.attribute.modifier.MobSpawnSettingsModifier;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.level.biome.Biome;
@@ -29,6 +34,17 @@ import net.minecraftforge.registries.ForgeRegistries;
 
 public final class ForgeBiomeModifiers {
     private ForgeBiomeModifiers() {} // Utility class.
+
+    private static @Nullable MobSpawnSettingsBuilder get(Builder builder) {
+        var entry = builder.attributes().get(EnvironmentAttributes.NATURAL_MOB_SPAWNS);
+        if (entry == null || entry.modifier() != MobSpawnSettingsModifier.overlay())
+            return null;
+        return new MobSpawnSettingsBuilder(entry.cast(MobSpawnSettingsModifier.overlay()));
+    }
+
+    private static void set(Builder builder, MobSpawnSettingsBuilder spawns) {
+        builder.attributes().modify(EnvironmentAttributes.NATURAL_MOB_SPAWNS, MobSpawnSettingsModifier.overlay(), spawns.build());
+    }
 
     /**
      * <p>Stock biome modifier that adds features to biomes. Has the following json format:</p>
@@ -56,7 +72,7 @@ public final class ForgeBiomeModifiers {
         @Override
         public void modify(Holder<Biome> biome, Phase phase, Builder builder) {
             if (phase == Phase.ADD && this.biomes.contains(biome)) {
-                var generationSettings = builder.getGenerationSettings();
+                var generationSettings = builder.generationSettings();
                 this.features.forEach(holder -> generationSettings.addFeature(this.step, holder));
             }
         }
@@ -105,7 +121,7 @@ public final class ForgeBiomeModifiers {
         @Override
         public void modify(Holder<Biome> biome, Phase phase, Builder builder) {
             if (phase == Phase.REMOVE && this.biomes.contains(biome)) {
-                var generationSettings = builder.getGenerationSettings();
+                var generationSettings = builder.generationSettings();
                 for (Decoration step : this.steps)
                     generationSettings.getFeatures(step).removeIf(this.features::contains);
             }
@@ -176,10 +192,13 @@ public final class ForgeBiomeModifiers {
         @Override
         public void modify(Holder<Biome> biome, Phase phase, Builder builder) {
             if (phase == Phase.ADD && this.biomes.contains(biome)) {
-                var spawns = builder.getMobSpawnSettings();
-                for (var weighted : this.spawners.unwrap()) {
-                    var spawner = weighted.value();
-                    spawns.addSpawn(spawner.type().getCategory(), weighted.weight(), spawner);
+                var spawns = get(builder);
+                if (spawns != null) {
+                    for (var weighted : this.spawners.unwrap()) {
+                        var spawner = weighted.value();
+                        spawns.addSpawn(spawner.type(), weighted.weight(), spawner.count());
+                    }
+                    set(builder, spawns);
                 }
             }
         }
@@ -207,15 +226,18 @@ public final class ForgeBiomeModifiers {
         public static final MapCodec<RemoveSpawnsBiomeModifier> CODEC = RecordCodecBuilder.mapCodec(builder ->
             builder.group(
                 Biome.LIST_CODEC.fieldOf("biomes").forGetter(RemoveSpawnsBiomeModifier::biomes),
-                RegistryCodecs.homogeneousList(ForgeRegistries.Keys.ENTITY_TYPES).fieldOf("entity_types").forGetter(RemoveSpawnsBiomeModifier::entityTypes)
+                RegistryCodecs.holderSet(ForgeRegistries.Keys.ENTITY_TYPES).fieldOf("entity_types").forGetter(RemoveSpawnsBiomeModifier::entityTypes)
             ).apply(builder, RemoveSpawnsBiomeModifier::new));
 
         @Override
         public void modify(Holder<Biome> biome, Phase phase, Builder builder) {
             if (phase == Phase.REMOVE && this.biomes.contains(biome)) {
-                var spawns = builder.getMobSpawnSettings();
-                for (var category : MobCategory.values())
-                    spawns.getSpawner(category).removeIf(data -> this.entityTypes.contains(ForgeRegistries.ENTITY_TYPES.getHolder(data.type()).orElseThrow()));
+                var spawns = get(builder);
+                if (spawns != null) {
+                    for (var category : MobCategory.values())
+                        spawns.getSpawner(category).removeIf(data -> this.entityTypes.contains(ForgeRegistries.ENTITY_TYPES.getHolder(data.type()).orElseThrow()));
+                    set(builder, spawns);
+                }
             }
         }
 

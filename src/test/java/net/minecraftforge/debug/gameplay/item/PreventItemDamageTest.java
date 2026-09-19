@@ -125,7 +125,7 @@ public class PreventItemDamageTest extends BaseTestMod {
 
         // test hurt and break
         var damaged = helper.<Item>flag("damaged shield");
-        shield.hurtAndBreak(1, helper.getLevel(), player, damaged::set);
+        shield.hurtAndBreak(1, helper.getLevel(), player, stack -> damaged.set(stack.getItem()));
         damaged.assertEquals(FAKE_SHIELD.get(), "Fake shield was not damaged! Check IForgeItem#damageItem.");
         helper.assertValueEqual(initialDamage + 1, shield.getDamageValue(), "shield damage value", "Fake shield did not take precisely 1 damage! Check IForgeItem#damageItem.");
 
@@ -160,9 +160,9 @@ public class PreventItemDamageTest extends BaseTestMod {
         }
 
         @Override
-        public int damageItem(ItemStack stack, int damage, ServerLevel level, @Nullable ServerPlayer player, boolean canBreak, Consumer<Item> onBroken) {
+        public int damageItem(ItemStack stack, int damage, ServerLevel level, @Nullable ServerPlayer player, boolean canBreak, Consumer<ItemStack> onBroken) {
             if (canBreak) {
-                onBroken.accept(this);
+                onBroken.accept(stack);
                 return 1;
             }
 

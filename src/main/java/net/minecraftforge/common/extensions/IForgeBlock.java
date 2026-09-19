@@ -6,6 +6,7 @@
 package net.minecraftforge.common.extensions;
 
 import java.util.Optional;
+import java.util.OptionalDouble;
 import java.util.function.BiConsumer;
 
 import net.minecraft.client.Camera;
@@ -23,13 +24,10 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.FishingHook;
 import net.minecraft.world.entity.projectile.hurtingprojectile.WitherSkull;
-import net.minecraft.world.item.*;
-import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.SignalGetter;
 import net.minecraft.world.level.block.*;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockBehaviour;
-import net.minecraft.world.level.levelgen.feature.configurations.TreeConfiguration;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.material.PushReaction;
@@ -51,8 +49,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraftforge.common.ToolAction;
-import net.minecraftforge.common.ToolActions;
+import net.minecraft.world.level.levelgen.feature.TreeFeature;
 import org.jetbrains.annotations.Nullable;
 
 @SuppressWarnings("deprecation")
@@ -241,7 +238,6 @@ public interface IForgeBlock {
      * @param occupied True if we are occupying the bed, or false if they are stopping use of the bed
      */
     default void setBedOccupied(BlockState state, Level level, BlockPos pos, LivingEntity sleeper, boolean occupied) {
-        level.setBlock(pos, state.setValue(BedBlock.OCCUPIED, occupied), 3);
     }
 
    /**
@@ -255,6 +251,17 @@ public interface IForgeBlock {
     */
     default Direction getBedDirection(BlockState state, LevelReader level, BlockPos pos) {
         return state.getValue(HorizontalDirectionalBlock.FACING);
+    }
+
+    /**
+     * Returns the height the player will appear to lay down and sleep at if this is a bed.
+     *
+     * @param level The current level
+     * @param pos Block position in level
+     * @return The height, or empty if this isn't a bed
+     */
+    default OptionalDouble getBedHeight(BlockState state, Level level, BlockPos pos) {
+        return self() instanceof AbstractBedBlock bed ? bed.getSleepHeight(state, level, pos) : OptionalDouble.empty();
     }
 
     /**
@@ -340,7 +347,7 @@ public interface IForgeBlock {
      * @param config Configuration of the trunk placer. Consider azalea trees, which should place rooted dirt instead of regular dirt.
      * @return True to ignore vanilla behaviour
      */
-    default boolean onTreeGrow(BlockState state, LevelReader level, BiConsumer<BlockPos, BlockState> placeFunction, RandomSource randomSource, BlockPos pos, TreeConfiguration config) {
+    default boolean onTreeGrow(BlockState state, LevelReader level, BiConsumer<BlockPos, BlockState> placeFunction, RandomSource randomSource, BlockPos pos, TreeFeature config) {
         return false;
     }
 
@@ -369,10 +376,7 @@ public interface IForgeBlock {
      * @return True, to support the conduit, and make it active with this block.
      */
     default boolean isConduitFrame(BlockState state, LevelReader level, BlockPos pos, BlockPos conduit) {
-        return  state.getBlock() == Blocks.PRISMARINE ||
-                state.getBlock() == Blocks.PRISMARINE_BRICKS ||
-                state.getBlock() == Blocks.SEA_LANTERN ||
-                state.getBlock() == Blocks.DARK_PRISMARINE;
+        return state.is(BlockTags.CONDUIT_EFFECT_BLOCK);
     }
 
     /**
@@ -657,7 +661,7 @@ public interface IForgeBlock {
      * @param explosion The explosion instance affecting the block
      */
     default void onBlockExploded(BlockState state, ServerLevel level, BlockPos pos, Explosion explosion) {
-        level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+        level.setBlockAndUpdate(pos, Blocks.AIR.defaultBlockState());
         self().wasExploded(level, pos, explosion);
     }
 
@@ -681,50 +685,6 @@ public interface IForgeBlock {
     default boolean shouldDisplayFluidOverlay(BlockState state, BlockAndTintGetter level, BlockPos pos, FluidState fluidState) {
         return state.getBlock() instanceof HalfTransparentBlock || state.getBlock() instanceof LeavesBlock;
     }
-
-    /**
-     * Returns the state that this block should transform into when right-clicked by a tool.
-     * For example: Used to determine if {@link ToolActions#AXE_STRIP an axe can strip},
-     * {@link ToolActions#SHOVEL_FLATTEN a shovel can path}, or {@link ToolActions#HOE_TILL a hoe can till}.
-     * Returns {@code null} if nothing should happen.
-     *
-     * @param state The current state
-     * @param context The use on context that the action was performed in
-     * @param toolAction The action being performed by the tool
-     * @param simulate If {@code true}, no actions that modify the world in any way should be performed. If {@code false}, the world may be modified.
-     * @return The resulting state after the action has been performed
-     */
-    @Nullable
-    default BlockState getToolModifiedState(BlockState state, UseOnContext context, ToolAction toolAction, boolean simulate) {
-        ItemStack itemStack = context.getItemInHand();
-        if (!itemStack.canPerformAction(toolAction))
-            return null;
-
-        if (ToolActions.AXE_STRIP == toolAction) {
-            return AxeItem.getAxeStrippingState(state);
-        } else if (ToolActions.AXE_SCRAPE == toolAction) {
-            return WeatheringCopper.getPrevious(state).orElse(null);
-        } else if (ToolActions.AXE_WAX_OFF == toolAction) {
-            return Optional.ofNullable(HoneycombItem.WAX_OFF_BY_BLOCK.get().get(state.getBlock())).map(block -> block.withPropertiesOf(state)).orElse(null);
-        } else if (ToolActions.SHOVEL_FLATTEN == toolAction) {
-            return ShovelItem.getShovelPathingState(state);
-        } else if (ToolActions.HOE_TILL == toolAction) {
-            // Logic copied from HoeItem#TILLABLES; needs to be kept in sync during updating
-            Block block = state.getBlock();
-            if (block == Blocks.ROOTED_DIRT) {
-                if (!simulate && !context.getLevel().isClientSide()) {
-                    Block.popResourceFromFace(context.getLevel(), context.getClickedPos(), context.getClickedFace(), new ItemStack(Items.HANGING_ROOTS));
-                }
-                return Blocks.DIRT.defaultBlockState();
-            } else if ((block == Blocks.GRASS_BLOCK || block == Blocks.DIRT_PATH || block == Blocks.DIRT || block == Blocks.COARSE_DIRT) &&
-                    context.getLevel().getBlockState(context.getClickedPos().above()).isAir()) {
-                return block == Blocks.COARSE_DIRT ? Blocks.DIRT.defaultBlockState() : Blocks.FARMLAND.defaultBlockState();
-            }
-        }
-
-        return null;
-    }
-
     /**
      * Checks if a player or entity handles movement on this block like scaffolding.
      *

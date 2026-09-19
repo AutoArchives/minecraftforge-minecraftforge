@@ -1,15 +1,15 @@
 --- a/net/minecraft/data/loot/BlockLootSubProvider.java
 +++ b/net/minecraft/data/loot/BlockLootSubProvider.java
-@@ -721,12 +_,16 @@
+@@ -707,12 +_,16 @@
  
      protected abstract void generate();
  
 +    protected Iterable<Block> getKnownBlocks() {
-+        return BuiltInRegistries.BLOCK;
++        return BuiltInRegistries.BLOCK.stream().filter(b -> net.minecraft.resources.Identifier.DEFAULT_NAMESPACE.equals(BuiltInRegistries.BLOCK.getKey(b).getNamespace()))::iterator;
 +    }
 +
      @Override
-     public void generate(final BiConsumer<ResourceKey<LootTable>, LootTable.Builder> output) {
+     public void run() {
          this.generate();
          Set<ResourceKey<LootTable>> seen = new HashSet<>();
  

@@ -66,6 +66,7 @@ import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.attribute.BedRule;
+import net.minecraft.world.attribute.EnvironmentAttributes;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
@@ -76,14 +77,12 @@ import net.minecraft.world.entity.npc.villager.AbstractVillager;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.entity.projectile.throwableitemprojectile.ThrownEnderpearl;
-import net.minecraft.world.flag.FeatureFlagSet;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ClickAction;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ItemUtils;
 import net.minecraft.world.item.TooltipFlag;
-import net.minecraft.world.item.alchemy.PotionBrewing.Builder;
-import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.item.trading.MerchantOffer;
 import net.minecraft.world.level.BaseSpawner;
@@ -95,6 +94,7 @@ import net.minecraft.world.level.LevelSimulatedReader;
 import net.minecraft.world.level.ServerLevelAccessor;
 import net.minecraft.world.level.SpawnData;
 import net.minecraft.world.level.biome.MobSpawnSettings;
+import net.minecraft.world.level.block.AbstractBedBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.NoteBlockInstrument;
 import net.minecraft.world.level.chunk.ChunkAccess;
@@ -102,18 +102,16 @@ import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.status.ChunkType;
 import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.level.gamerules.GameRules;
-import net.minecraft.world.level.levelgen.feature.ConfiguredFeature;
+import net.minecraft.world.level.levelgen.feature.Feature;
 import net.minecraft.world.level.portal.PortalShape;
 import net.minecraft.world.level.storage.ServerLevelData;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.loot.LootTable;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.common.ToolAction;
 import net.minecraftforge.common.capabilities.CapabilityDispatcher;
 import net.minecraftforge.common.capabilities.ICapabilityProvider;
 import net.minecraftforge.common.util.BlockSnapshot;
-import net.minecraftforge.event.brewing.BrewingRecipeRegisterEvent;
 import net.minecraftforge.event.brewing.PlayerBrewedPotionEvent;
 import net.minecraftforge.event.brewing.PotionBrewEvent;
 import net.minecraftforge.event.enchanting.EnchantmentLevelSetEvent;
@@ -180,7 +178,6 @@ import net.minecraftforge.event.entity.player.TradeWithVillagerEvent;
 import net.minecraftforge.event.furnace.FurnaceFuelBurnTimeEvent;
 import net.minecraftforge.event.level.AlterGroundEvent;
 import net.minecraftforge.event.level.BlockEvent;
-import net.minecraftforge.event.level.BlockEvent.BlockToolModificationEvent;
 import net.minecraftforge.event.level.BlockEvent.CreateFluidSourceEvent;
 import net.minecraftforge.event.level.BlockEvent.EntityMultiPlaceEvent;
 import net.minecraftforge.event.level.BlockEvent.NeighborNotifyEvent;
@@ -355,8 +352,8 @@ public final class ForgeEventFactory {
         return BlockEvent.FluidPlaceBlockEvent.BUS.fire(new BlockEvent.FluidPlaceBlockEvent(level, pos, liquidPos, state)).getNewState();
     }
 
-    public static ItemTooltipEvent onItemTooltip(ItemStack itemStack, @Nullable Player entityPlayer, List<Component> list, TooltipFlag flags, Item.TooltipContext context, TooltipDisplay display) {
-        return ItemTooltipEvent.BUS.fire(new ItemTooltipEvent(itemStack, entityPlayer, list, flags, context, display));
+    public static void onItemTooltip(ItemStack itemStack, @Nullable Player entityPlayer, List<Component> list, TooltipFlag flags, Item.TooltipContext context, TooltipDisplay display) {
+        ItemTooltipEvent.BUS.post(new ItemTooltipEvent(itemStack, entityPlayer, list, flags, context, display));
     }
 
     public static SummonAidEvent fireZombieSummonAid(Zombie zombie, Level level, int x, int y, int z, LivingEntity attacker, double summonChance) {
@@ -401,12 +398,6 @@ public final class ForgeEventFactory {
         PlayerEvent.SaveToFile.BUS.post(new PlayerEvent.SaveToFile(player, playerDirectory, uuidString));
     }
 
-    @Nullable
-    public static BlockState onToolUse(BlockState originalState, UseOnContext context, ToolAction toolAction, boolean simulate) {
-        var event = new BlockToolModificationEvent(originalState, context, toolAction, simulate);
-        return BlockToolModificationEvent.BUS.post(event) ? null : event.getFinalState();
-    }
-
     public static int onApplyBonemeal(@Nullable Player player, Level level, BlockPos pos, BlockState state, ItemStack stack) {
         if (player == null)
             return 0;
@@ -427,19 +418,9 @@ public final class ForgeEventFactory {
         if (FillBucketEvent.BUS.post(event))
             return InteractionResult.FAIL;
 
-        if (event.getResult() == Result.ALLOW) {
-            if (player.getAbilities().instabuild)
-                return InteractionResult.SUCCESS.heldItemTransformedTo(stack);
+        if (event.getResult() == Result.ALLOW)
+            return InteractionResult.SUCCESS.heldItemTransformedTo(ItemUtils.createFilledResult(stack, player, event.getFilledBucket()));
 
-            stack.shrink(1);
-            if (stack.isEmpty())
-                return InteractionResult.SUCCESS.heldItemTransformedTo(event.getFilledBucket());
-
-            if (!player.getInventory().add(event.getFilledBucket()))
-                player.drop(event.getFilledBucket(), false);
-
-            return InteractionResult.SUCCESS.heldItemTransformedTo(stack);
-        }
         return null;
     }
 
@@ -497,7 +478,7 @@ public final class ForgeEventFactory {
         PlayerFlyableFallEvent.BUS.post(new PlayerFlyableFallEvent(player, distance, multiplier));
     }
 
-    public static boolean onPlayerSpawnSet(ServerPlayer player, ServerPlayer.RespawnConfig config) {
+    public static boolean onPlayerSpawnSet(ServerPlayer player, ServerPlayer.@Nullable RespawnConfig config) {
         return PlayerSetSpawnEvent.BUS.post(new PlayerSetSpawnEvent(player, config));
     }
 
@@ -575,9 +556,15 @@ public final class ForgeEventFactory {
 
         Result canContinueSleep = evt.getResult();
         if (canContinueSleep == Result.DEFAULT)
-            return player.getSleepingPos().map(pos -> player.level().getBlockState(pos).isBed(player.level(), pos, player)).orElse(false);
+            return player.getSleepingPos().map(pos -> player.level().getBlockState(pos).getBedHeight(player.level(), sleepingLocation).isPresent()).orElse(false);
         else
             return canContinueSleep == Result.ALLOW;
+    }
+
+    public static boolean onSleepingTimeCheck(Player player, Optional<BlockPos> sleepingLocation) {
+        var state = player.getInBlockState();
+        var rule = state.getBlock() instanceof AbstractBedBlock bed ? bed.getBedRule(player.level(), player.blockPosition()) : player.level().environmentAttributes().getValue(EnvironmentAttributes.BED_RULE, player.blockPosition());
+        return onSleepingTimeCheck(player, sleepingLocation, rule);
     }
 
     public static boolean onSleepingTimeCheck(Player player, Optional<BlockPos> sleepingLocation, BedRule rule) {
@@ -585,10 +572,10 @@ public final class ForgeEventFactory {
         SleepingTimeCheckEvent.BUS.post(evt);
 
         var canContinueSleep = evt.getResult();
-        if (canContinueSleep == Result.DEFAULT)
-            return rule.canSleep(player.level());
-        else
+        if (canContinueSleep != Result.DEFAULT)
             return canContinueSleep == Result.ALLOW;
+
+        return rule.canSleep(player.level());
     }
 
     public static InteractionResult onArrowNock(ItemStack item, Level level, Player player, InteractionHand hand, boolean hasAmmo) {
@@ -644,8 +631,7 @@ public final class ForgeEventFactory {
         return result == Result.DEFAULT ? level.getGameRules().get(GameRules.MOB_GRIEFING) : result == Result.ALLOW;
     }
 
-    @SuppressWarnings("removal")
-    public static BlockFeatureGrowEvent blockGrowFeature(LevelAccessor level, RandomSource randomSource, BlockPos pos, @Nullable Holder<ConfiguredFeature<?, ?>> holder) {
+    public static BlockFeatureGrowEvent blockGrowFeature(LevelAccessor level, RandomSource randomSource, BlockPos pos, @Nullable Holder<Feature> holder) {
         return BlockFeatureGrowEvent.BUS.fire(new BlockFeatureGrowEvent(level, randomSource, pos, holder));
     }
 
@@ -709,9 +695,9 @@ public final class ForgeEventFactory {
         return EntityTeleportEvent.SpreadPlayersCommand.BUS.post(event) ? null : event;
     }
 
-    public static EntityTeleportEvent.@Nullable EnderEntity onEnderManTeleport(LivingEntity entity, double targetX, double targetY, double targetZ) {
-        var event = new EntityTeleportEvent.EnderEntity(entity, targetX, targetY, targetZ);
-        return EntityTeleportEvent.EnderEntity.BUS.post(event) ? null : event;
+    public static EntityTeleportEvent.@Nullable EntityRandom onEntityRandomTeleport(LivingEntity entity, double targetX, double targetY, double targetZ) {
+        var event = new EntityTeleportEvent.EntityRandom(entity, targetX, targetY, targetZ);
+        return EntityTeleportEvent.EntityRandom.BUS.post(event) ? null : event;
     }
 
     public static EntityTeleportEvent.@Nullable EnderPearl onEnderPearlLand(ServerPlayer entity, double targetX, double targetY, double targetZ, ThrownEnderpearl pearlEntity, float attackDamage, HitResult hitResult) {
@@ -1020,10 +1006,6 @@ public final class ForgeEventFactory {
     public static GrindstoneEvent.@Nullable OnPlaceItem onGrindstoneChange(@NonNull ItemStack top, @NonNull ItemStack bottom, Container outputSlot, int xp) {
         var event = new GrindstoneEvent.OnPlaceItem(top, bottom, xp);
         return GrindstoneEvent.OnPlaceItem.BUS.post(event) ? null : event;
-    }
-
-    public static void onBrewingRecipeRegister(Builder builder, FeatureFlagSet features) {
-        BrewingRecipeRegisterEvent.BUS.post(new BrewingRecipeRegisterEvent(builder, features));
     }
 
     public static boolean onItemStackedOn(ItemStack carriedItem, ItemStack stackedOnItem, Slot slot, ClickAction action, Player player, SlotAccess carriedSlotAccess) {

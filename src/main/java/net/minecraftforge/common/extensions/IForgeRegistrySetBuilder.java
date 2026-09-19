@@ -5,9 +5,10 @@
 
 package net.minecraftforge.common.extensions;
 
-import com.mojang.serialization.Lifecycle;
-
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.RegistrySetBuilder;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraftforge.registries.DeferredRegisterData;
 
 public interface IForgeRegistrySetBuilder {
@@ -19,7 +20,11 @@ public interface IForgeRegistrySetBuilder {
         return self().add(dr.getRegistryKey(), dr);
     }
 
-    default <T> RegistrySetBuilder add(DeferredRegisterData<T> dr, Lifecycle lifecycle) {
-        return self().add(dr.getRegistryKey(), lifecycle, dr);
+    default RegistrySetBuilder copy() {
+        return new RegistrySetBuilder().add(self());
+    }
+
+    default HolderLookup.Provider buildBuiltIn() {
+        return self().build(RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY));
     }
 }

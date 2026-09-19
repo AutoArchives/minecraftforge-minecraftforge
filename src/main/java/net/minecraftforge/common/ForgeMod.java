@@ -36,6 +36,7 @@ import net.minecraft.sounds.SoundEvent;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.pathfinder.PathType;
 import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+import net.minecraft.world.level.storage.loot.predicates.LootPredicates;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.ForgeAtlasProvider;
@@ -47,9 +48,9 @@ import net.minecraftforge.common.data.ForgeEnchantmentTagsProvider;
 import net.minecraftforge.common.data.ForgeEntityTypeTagsProvider;
 import net.minecraftforge.common.data.ForgeFluidTagsProvider;
 import net.minecraftforge.common.data.ForgeItemTagsProvider;
-import net.minecraftforge.common.data.ForgeLootTableProvider;
 import net.minecraftforge.common.data.ForgeRecipeProvider;
 import net.minecraftforge.common.data.ForgeStructureTagsProvider;
+import net.minecraftforge.common.data.RegistryDataBuilder;
 import net.minecraftforge.common.data.VanillaSoundDefinitionsProvider;
 import net.minecraftforge.common.loot.CanToolPerformAction;
 import net.minecraftforge.common.loot.LootTableIdCondition;
@@ -428,6 +429,16 @@ public class ForgeMod {
         PackOutput packOutput = gen.getPackOutput();
         CompletableFuture<HolderLookup.Provider> lookupProvider = event.getLookupProvider();
 
+        var dataLayers = RegistryDataBuilder.of()
+            .name("forge")
+            .reloadable(set -> set
+                .add(Registries.PREDICATE, ctx ->
+                    // Replace vanilla's MatchTool(shears) -> CanToolPerformAction(SHEARS_DIG)
+                    ctx.register(LootPredicates.TOOL_CAN_SHEAR, CanToolPerformAction.canToolPerformAction(ToolActions.SHEARS_DIG).build())
+                )
+                .add(ForgeRecipeProvider.create())
+            );
+
         ExistingFileHelper existingFileHelper = event.getExistingFileHelper();
         gen.addProvider(true, new PackMetadataGenerator(packOutput)
             .add(PackMetadataSection.SERVER_TYPE, new PackMetadataSection(
@@ -441,8 +452,7 @@ public class ForgeMod {
         gen.addProvider(event.includeServer(), new ForgeEntityTypeTagsProvider(packOutput, lookupProvider, existingFileHelper));
         gen.addProvider(event.includeServer(), new ForgeFluidTagsProvider(packOutput, lookupProvider, existingFileHelper));
         gen.addProvider(event.includeServer(), new ForgeEnchantmentTagsProvider(packOutput, lookupProvider, existingFileHelper));
-        gen.addProvider(event.includeServer(), new ForgeRecipeProvider.Runner(packOutput, lookupProvider));
-        gen.addProvider(event.includeServer(), new ForgeLootTableProvider(packOutput, lookupProvider));
+        gen.addProvider(event.includeServer(), dataLayers.reloadableGenerator(packOutput));
         gen.addProvider(event.includeServer(), new ForgeBiomeTagsProvider(packOutput, lookupProvider, existingFileHelper));
         gen.addProvider(event.includeServer(), new ForgeStructureTagsProvider(packOutput, lookupProvider, existingFileHelper));
 
