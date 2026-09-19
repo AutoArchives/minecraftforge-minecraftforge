@@ -92,13 +92,16 @@
          super.die(source);
          this.reapplyPosition();
          if (!this.isSpectator() && this.level() instanceof ServerLevel level) {
-@@ -580,7 +_,17 @@
+@@ -580,7 +_,20 @@
      public void handleCreativeModeItemDrop(final ItemStack stack) {
      }
  
 +    @Override
 +    public net.minecraft.world.entity.item.@Nullable ItemEntity drop(final ItemStack itemStack, final boolean thrownFromHand, final net.minecraft.util.Prediction prediction) {
-+        return net.minecraftforge.common.ForgeHooks.onPlayerTossEvent(this, itemStack, thrownFromHand, prediction);
++        captureDrops(new ArrayList<>());
++        var ret = super.drop(itemStack, thrownFromHand, prediction);
++        captureDrops(null);
++        return net.minecraftforge.common.ForgeHooks.onPlayerTossEvent(this, ret);
 +    }
 +
 +    /** @deprecated Use {@link #getDestroySpeed(BlockState,BlockPos) */

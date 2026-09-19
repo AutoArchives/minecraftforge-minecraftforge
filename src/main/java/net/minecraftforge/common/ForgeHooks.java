@@ -306,23 +306,17 @@ public final class ForgeHooks {
 
     @SuppressWarnings("resource")
     @Nullable
-    public static ItemEntity onPlayerTossEvent(@NotNull Player player, @NotNull ItemStack item, boolean thrownFromHand, Prediction prediction) {
-        if (item.isEmpty())
+    public static ItemEntity onPlayerTossEvent(@NotNull Player player, @Nullable ItemEntity entity) {
+        if (entity == null)
             return null;
 
-        player.captureDrops(new ArrayList<>());
-        ItemEntity ret = player.drop(item, thrownFromHand, prediction);
-        player.captureDrops(null);
-
-        if (ret == null)
-            return null;
-
-        var event = new ItemTossEvent(ret, player);
+        var event = new ItemTossEvent(entity, player);
         if (ItemTossEvent.BUS.post(event))
             return null;
 
         if (!player.level().isClientSide())
             player.level().addFreshEntity(event.getEntity());
+
         return event.getEntity();
     }
 
@@ -1012,12 +1006,12 @@ public final class ForgeHooks {
      * @param refillAirAmount  The amount of air to refill when the entity is able to breathe
      * @implNote This method needs to closely replicate the logic found right after the call site in {@link LivingEntity#baseTick()} as it overrides it.
      */
-    @SuppressWarnings("deprecation")
     public static void onLivingBreathe(LivingEntity entity, int consumeAirAmount, int refillAirAmount) {
         // Check things that vanilla considers to be air - these will cause the air supply to be increased.
         // This is only called when the server level is already checked
         var level = (ServerLevel)entity.level();
         var eyeFluid = entity.getEyeInFluidType();
+
         boolean isAir = eyeFluid.isAir() || level.getBlockState(BlockPos.containing(entity.getX(), entity.getEyeY(), entity.getZ())).is(Blocks.BUBBLE_COLUMN);
         // The following effects cause the entity to not drown, but do not cause the air supply to be increased.
         boolean canBreathe = !entity.canDrownInFluidType(eyeFluid) || MobEffectUtil.hasWaterBreathing(entity) || (entity instanceof Player player && player.getAbilities().invulnerable);

@@ -149,15 +149,6 @@
          ItemStack removed = inventory.removeFromSelected(all);
          this.containerMenu
              .findSlot(inventory, inventory.getSelectedSlot())
-@@ -2127,7 +_,7 @@
-             this.stopUsingItem();
-         }
- 
--        this.drop(removed, true, Prediction.PREDICTED);
-+        net.minecraftforge.common.ForgeHooks.onPlayerTossEvent(this, removed, true, Prediction.PREDICTED);
-         this.resetAttackStrengthTicker();
-     }
- 
 @@ -2229,6 +_,75 @@
  
      public @Nullable BlockPos getRaidOmenPosition() {
