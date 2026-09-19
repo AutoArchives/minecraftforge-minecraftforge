@@ -52,7 +52,7 @@
          BlockGetter level = entity.level();
          BlockPos.MutableBlockPos mutablePos = new BlockPos.MutableBlockPos();
  
-@@ -68,17 +_,22 @@
+@@ -68,22 +_,28 @@
                      mutablePos.set(x, y, z);
                      FluidState fluidState = level.getFluidState(mutablePos);
                      if (!fluidState.isEmpty()) {
@@ -77,6 +77,12 @@
  
                              if (x == eyeBlockX && z == eyeBlockZ && eyeY >= fluidBottom) {
                                  double fluidTopForCamera = fluidBottom + fluidState.getHeightForCamera(level, mutablePos);
+                                 if (eyeY <= fluidTopForCamera) {
+                                     tracker.eyesInside = true;
++                                    this.eyeFluid = lastFluidType.get().getFluidType();
+                                 }
+                             }
+ 
 @@ -97,6 +_,7 @@
  
                                  current.accumulate(flow);
