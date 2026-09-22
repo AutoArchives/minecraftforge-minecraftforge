@@ -12,6 +12,7 @@ forgedev
 
 #idea
 /.idea
+/build-logic/.idea/
 /*/out
 /classes
 *.iml
@@ -36,7 +37,9 @@ src/minecraft
 /projects/**/build/
 /projects/**/out/
 /projects/**/run/
+/*/runs/
 /projects/**/*.launch
+*.launch
 /repo/
 /rejects-*/
 src/*/generated/**/.cache/
